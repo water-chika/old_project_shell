@@ -5,11 +5,19 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
+void print_prompt(void)
+{
+	char* cwd = getcwd(NULL, 0);
+	printf("%s", cwd);
+	free(cwd);
+	printf("$ ");
+}
+
 int main(int argc, char** argv)
 {
 	char* line = NULL;
 	size_t line_size = 0;
-	while (printf("$ "), 0 <= getline(&line, &line_size, stdin))
+	while (print_prompt(), 0 <= getline(&line, &line_size, stdin))
 	{
 		int cmd_argc = 0;
 		char* cmd_argv[256];
