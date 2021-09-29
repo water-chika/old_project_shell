@@ -1,9 +1,11 @@
 #include <stdio.h>
+#include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <search.h>
 
 void print_prompt(void)
 {
@@ -13,8 +15,30 @@ void print_prompt(void)
 	printf("$ ");
 }
 
-int main(int argc, char** argv)
+int cd_func(int argc, char**argv);
+int exit_func(int argc, char** argv);
+int showenv_func(int argc, char** argv);
+
+typedef struct
 {
+	char* cmd;
+	int (*func)(int argc, char**argv);
+}command_t;
+
+command_t cmd_table[] = {
+	{"cd",cd_func},
+	{"exit",exit_func},
+	{"showenv", showenv_func},
+};
+
+int command_name_compare(const void* a, const void* b)
+{
+	return strcmp(((command_t*)a)->cmd, ((command_t*)b)->cmd);
+}
+char** environ;
+int main(int argc, char** argv, char** envp)
+{
+	environ = envp;
 	char* line = NULL;
 	size_t line_size = 0;
 	while (print_prompt(), 0 <= getline(&line, &line_size, stdin))
@@ -27,34 +51,50 @@ int main(int argc, char** argv)
 			assert(cmd_argc<255);
 		}
 
-		/*for (int i = 0; i < cmd_argc; i++)
-		{
-			printf("%d:%s\n", i, cmd_argv[i]);
-		}*/
+		command_t search_cmd;
+		search_cmd.cmd = cmd_argv[0];
+		size_t cmd_table_len = sizeof(cmd_table)/sizeof(cmd_table[0]);
+		command_t* cmd = lfind(&search_cmd, cmd_table, &cmd_table_len,
+			sizeof(cmd_table[0]), command_name_compare);
 
-		if (0 == strcmp(cmd_argv[0], "cd"))
+		if (cmd)
 		{
-			chdir(cmd_argv[1]);
-			continue;
+			cmd->func(cmd_argc, cmd_argv);
 		}
-		else if (0 == strcmp(cmd_argv[0], "exit"))
+		if (!cmd)
 		{
-			break;
-		}
-		
-		pid_t child_pid = fork();
-		assert(child_pid !=-1);
+			pid_t child_pid = fork();
+			assert(child_pid !=-1);
 
-		if (child_pid == 0)
-		{
-			execvp(cmd_argv[0], cmd_argv);
-			fprintf(stderr, "can not find command %s", cmd_argv[0]);
-			perror(" ");
-			exit(-1);
-		}
+			if (child_pid == 0)
+			{
+				execvp(cmd_argv[0], cmd_argv);
+				fprintf(stderr,
+					 "can not find command %s", cmd_argv[0]);
+				perror(" ");
+				exit(-1);
+			}
 
-		int return_code;
-		waitpid(child_pid, &return_code,0);
+			int return_code;
+			waitpid(child_pid, &return_code,0);
+		}
+	}
+	return 0;
+}
+int cd_func(int argc, char**argv)
+{
+	chdir(argv[1]);
+	return 0;
+}
+int exit_func(int argc, char** argv)
+{
+	exit(0);
+}
+int showenv_func(int argc, char** argv)
+{
+	for (int i = 0; environ[i]; i++)
+	{
+		printf("%s\n", environ[i]);
 	}
 	return 0;
 }
