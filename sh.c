@@ -79,6 +79,7 @@ int main(int argc, char** argv, char** envp)
 			int return_code;
 			waitpid(child_pid, &return_code,0);
 		}
+		free(line);
 	}
 	return 0;
 }
