@@ -6,13 +6,15 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <search.h>
+#include <readline/readline.h>
 
-void print_prompt(void)
+char* get_prompt(void)
 {
+	static char prompt[128];
 	char* cwd = getcwd(NULL, 0);
-	printf("%s", cwd);
+	sprintf(prompt, "%s $", cwd);
 	free(cwd);
-	printf("$ ");
+	return prompt;
 }
 
 int cd_func(int argc, char**argv);
@@ -40,8 +42,7 @@ int main(int argc, char** argv, char** envp)
 {
 	environ = envp;
 	char* line = NULL;
-	size_t line_size = 0;
-	while (print_prompt(), 0 <= getline(&line, &line_size, stdin))
+	while (line = readline(get_prompt()))
 	{
 		int cmd_argc = 0;
 		char* cmd_argv[256];
