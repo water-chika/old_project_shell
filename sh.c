@@ -5,6 +5,7 @@
 #include <assert.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <sys/reboot.h>
 #include <search.h>
 #include <readline/readline.h>
 
@@ -19,7 +20,7 @@ char* get_prompt(void)
 
 int cd_func(int argc, char**argv);
 int exit_func(int argc, char** argv);
-int showenv_func(int argc, char** argv);
+int printenv_func(int argc, char** argv);
 
 typedef struct
 {
@@ -30,7 +31,7 @@ typedef struct
 command_t cmd_table[] = {
 	{"cd",cd_func},
 	{"exit",exit_func},
-	{"showenv", showenv_func},
+	{"printenv", printenv_func},
 };
 
 int command_name_compare(const void* a, const void* b)
@@ -42,11 +43,14 @@ int main(int argc, char** argv, char** envp)
 {
 	environ = envp;
 	char* line = NULL;
-	while (line = readline(get_prompt()))
+	size_t line_size = 0;
+	while (printf("%s",get_prompt()), getline(&line, &line_size, stdin))
 	{
+		if (*line == '\0')continue;
 		int cmd_argc = 0;
 		char* cmd_argv[256];
 		cmd_argv[cmd_argc] = strtok(line, " \n");
+		assert(cmd_argv[cmd_argc]);
 		while (cmd_argv[++cmd_argc] = strtok(NULL, " \n"))
 		{
 			assert(cmd_argc<255);
@@ -79,7 +83,15 @@ int main(int argc, char** argv, char** envp)
 			int return_code;
 			waitpid(child_pid, &return_code,0);
 		}
-		free(line);
+	}
+	free(line);
+	line_size = 0;
+	if (getpid() == 1)
+	{
+		sync();
+		reboot(RB_POWER_OFF);
+		perror("shutdown fail");
+		sleep(10);
 	}
 	return 0;
 }
@@ -90,9 +102,16 @@ int cd_func(int argc, char**argv)
 }
 int exit_func(int argc, char** argv)
 {
+	if (getpid() == 1)
+	{
+		sync();
+		reboot(RB_POWER_OFF);
+		perror("shutdown fail");
+		sleep(10);
+	}
 	exit(0);
 }
-int showenv_func(int argc, char** argv)
+int printenv_func(int argc, char** argv)
 {
 	for (int i = 0; environ[i]; i++)
 	{
